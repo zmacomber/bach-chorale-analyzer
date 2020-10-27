@@ -1,51 +1,57 @@
+package com.bach.chorale;
+
+import jm.JMC;
+import jm.music.data.Part;
+import jm.music.data.Phrase;
+import jm.music.data.Score;
+import jm.util.Play;
+
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import javax.sound.midi.MidiSystem;
-
-import jm.JMC;
-import jm.music.data.*;
-import jm.util.*;
 
 public class BachChoraleAnalyzer implements JMC {
 
 	public static void main(String[] args) throws Exception {
-        BachChoraleAnalyzer bca = new BachChoraleAnalyzer(args[0]);
+	    String bachChoraleFileName = ((args != null) && (args.length > 0)) ? args[0] : null;
 
-		Phrase soprano = new Phrase();
-		Phrase alto = new Phrase();
-		Phrase tenor = new Phrase();
-		Phrase bass = new Phrase();
-		
-		soprano.addNoteList(bca.pitchSop, bca.rhythmSop);
-		alto.addNoteList(bca.pitchAlto, bca.rhythmAlto);
-		tenor.addNoteList(bca.pitchTenor, bca.rhythmTenor);
-		bass.addNoteList(bca.pitchBass, bca.rhythmBass);
-		
-		Part s = new Part("Soprano", OOH, 1);
-		Part a = new Part("Alto", AAH, 2);
-		Part t = new Part("Tenor", OOH, 3);
-		Part b = new Part("Bass", AAH, 4);
-		
-		s.addPhrase(soprano);
-		a.addPhrase(alto);
-		t.addPhrase(tenor);
-		b.addPhrase(bass);
-		
-		Score score = new Score(args[0]);
-		
-		score.addPart(s);
-		score.addPart(a);
-		score.addPart(t);
-		score.addPart(b);
-		
-		Play.midi(score);
+	    BachChoraleAnalyzer bca = new BachChoraleAnalyzer(bachChoraleFileName);
+
+	    if (bachChoraleFileName != null) {
+            Phrase soprano = new Phrase();
+            Phrase alto = new Phrase();
+            Phrase tenor = new Phrase();
+            Phrase bass = new Phrase();
+
+            soprano.addNoteList(bca.pitchSop, bca.rhythmSop);
+            alto.addNoteList(bca.pitchAlto, bca.rhythmAlto);
+            tenor.addNoteList(bca.pitchTenor, bca.rhythmTenor);
+            bass.addNoteList(bca.pitchBass, bca.rhythmBass);
+
+            Part s = new Part("Soprano", OOH, 1);
+            Part a = new Part("Alto", AAH, 2);
+            Part t = new Part("Tenor", OOH, 3);
+            Part b = new Part("Bass", AAH, 4);
+
+            s.addPhrase(soprano);
+            a.addPhrase(alto);
+            t.addPhrase(tenor);
+            b.addPhrase(bass);
+
+            Score score = new Score(args[0]);
+
+            score.addPart(s);
+            score.addPart(a);
+            score.addPart(t);
+            score.addPart(b);
+
+            Play.midi(score);
+        }
 	}
 
     enum Tonic {
@@ -64,7 +70,7 @@ public class BachChoraleAnalyzer implements JMC {
         }
     }
 
-    private final List<String> allLines;
+    private final Map<Integer, String> allLines = new TreeMap<>();
 
     private final int[] pitchSop;
     private final double[] rhythmSop;
@@ -75,20 +81,45 @@ public class BachChoraleAnalyzer implements JMC {
     private final int[] pitchBass;
     private final double[] rhythmBass;
 
-    BachChoraleAnalyzer(String satbCsvFileName) throws Exception {
-        allLines = Files.readAllLines(Paths.get(satbCsvFileName));
+    BachChoraleAnalyzer(String bachChoraleFileName) throws IOException {
+        if (bachChoraleFileName != null) {
+            addToAllLines(Files.readAllLines(Paths.get(bachChoraleFileName)));
+        } else {
+            try (Stream<Path> paths = Files.walk(Paths.get(""))) {
+                paths.filter(Files::isRegularFile).filter(path -> path.toString().contains(".csv")).forEach(path -> {
+                    try {
+                        System.out.println("Processing " + path);
+                        addToAllLines(Files.readAllLines(path));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+            }
+        }
 
-        pitchSop    = Stream.of(allLines.get(0).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.SOP)).toArray();
-        rhythmSop   = Stream.of(allLines.get(1).split(",")).mapToDouble(this::mapNote).toArray();
-        pitchAlto   = Stream.of(allLines.get(2).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.MID)).toArray();
-        rhythmAlto  = Stream.of(allLines.get(3).split(",")).mapToDouble(this::mapNote).toArray();
-        pitchTenor  = Stream.of(allLines.get(4).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.MID)).toArray();
-        rhythmTenor = Stream.of(allLines.get(5).split(",")).mapToDouble(this::mapNote).toArray();
-        pitchBass   = Stream.of(allLines.get(6).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.BASS)).toArray();
-        rhythmBass  = Stream.of(allLines.get(7).split(",")).mapToDouble(this::mapNote).toArray();
+        pitchSop    = Stream.of(allLines.get(1).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.SOP)).toArray();
+        rhythmSop   = Stream.of(allLines.get(2).split(",")).mapToDouble(this::mapNote).toArray();
+        pitchAlto   = Stream.of(allLines.get(3).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.MID)).toArray();
+        rhythmAlto  = Stream.of(allLines.get(4).split(",")).mapToDouble(this::mapNote).toArray();
+        pitchTenor  = Stream.of(allLines.get(5).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.MID)).toArray();
+        rhythmTenor = Stream.of(allLines.get(6).split(",")).mapToDouble(this::mapNote).toArray();
+        pitchBass   = Stream.of(allLines.get(7).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.BASS)).toArray();
+        rhythmBass  = Stream.of(allLines.get(8).split(",")).mapToDouble(this::mapNote).toArray();
 
         printStepWiseStats();
         printScaleDegreeStats();
+    }
+
+    private void addToAllLines(List<String> fileLines) {
+        int lineNum = 1;
+        for (String line : fileLines) {
+            if (allLines.containsKey(lineNum)) {
+                allLines.put(lineNum, allLines.get(lineNum) + "," + line);
+            } else {
+                allLines.put(lineNum, line);
+            }
+            lineNum++;
+        }
     }
 
     private int mapScaleDegree(String scaleDegree, Tonic tonic) {
@@ -118,7 +149,7 @@ public class BachChoraleAnalyzer implements JMC {
             case "-7":
                 return tonic.getBasePitch() + -1;
             case "1":
-                return tonic.getBasePitch() + 0;
+                return tonic.getBasePitch();
             case "1+": case "2-" :
                 return tonic.getBasePitch() + 1;
             case "2":
@@ -190,7 +221,7 @@ public class BachChoraleAnalyzer implements JMC {
         determineSteps(steps,pitchTenor);
         determineSteps(steps,pitchBass);
         int totalOccurrences = steps.values().stream().mapToInt(Integer::valueOf).sum();
-        steps.forEach((key, value) -> System.out.println("Step " + key + " occurs " + value + " times (" + (((double)value / (double)totalOccurrences) * 100) + "%)."));
+        steps.forEach((key, value) -> System.out.println("Step " + key + " occurs " + value + " times (" + getPercentage(value, totalOccurrences) + "%)."));
     }
 
     private void determineSteps(Map<Integer,Integer> steps, int[] pitches) {
@@ -206,25 +237,31 @@ public class BachChoraleAnalyzer implements JMC {
 
     private void printScaleDegreeStats() {
         Map<String,Integer> scaleDegrees = new TreeMap<>();
-        
-        determineScaleDegrees(scaleDegrees,allLines.get(0).split(","));
-        determineScaleDegrees(scaleDegrees,allLines.get(2).split(","));
-        determineScaleDegrees(scaleDegrees,allLines.get(4).split(","));
-        determineScaleDegrees(scaleDegrees,allLines.get(6).split(","));
+
+        determineScaleDegrees(scaleDegrees,allLines.get(1).split(","));
+        determineScaleDegrees(scaleDegrees,allLines.get(3).split(","));
+        determineScaleDegrees(scaleDegrees,allLines.get(5).split(","));
+        determineScaleDegrees(scaleDegrees,allLines.get(7).split(","));
         int totalOccurrences = scaleDegrees.values().stream().mapToInt(Integer::valueOf).sum();
         scaleDegrees.forEach(
-            (key, value) -> System.out.println("Scale degree " + key + " occurs " + value + " times (" + (((double)value / (double)totalOccurrences) * 100) + "%).")
+            (key, value) -> System.out.println("Scale degree " + key + " occurs " + value + " times (" + getPercentage(value, totalOccurrences) + "%).")
         );
     }
 
     private void determineScaleDegrees(Map<String,Integer> scaleDegrees, String[] pitches) {
-        for (int x = 0; x < pitches.length; x++) {
-            String pitch = pitches[x].replace("8","1").replace("9","2");
+        for (String s : pitches) {
+            String pitch = s.replace("8", "1").replace("9", "2")
+                    .replace("10", "3").replace("11", "4")
+                    .replace("12", "5");
             if (pitch.startsWith("-")) {
                 pitch = pitch.substring(1);
             }
             int occurences = scaleDegrees.getOrDefault(pitch, 0) + 1;
             scaleDegrees.put(pitch, occurences);
         }
+    }
+
+    private long getPercentage(int value, int totalOccurrences) {
+        return Math.round(((double)value / (double)totalOccurrences) * 100);
     }
 }
