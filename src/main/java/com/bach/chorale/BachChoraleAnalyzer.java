@@ -7,15 +7,50 @@ import jm.music.data.Score;
 import jm.util.Play;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
+import java.net.URISyntaxException;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.stream.Stream;
 
 public class BachChoraleAnalyzer implements JMC {
+
+    private final Map<Integer,String> allLines;
+
+    private final int[] pitchSop;
+    private final double[] rhythmSop;
+    private final int[] pitchAlto;
+    private final double[] rhythmAlto;
+    private final int[] pitchTenor;
+    private final double[] rhythmTenor;
+    private final int[] pitchBass;
+    private final double[] rhythmBass;
+
+    BachChoraleAnalyzer(String bachChoraleFileName) throws IOException, URISyntaxException {
+
+        allLines = new AllLines(bachChoraleFileName).build();
+
+        pitchSop = getPitch( 1, Tonic.SOP);
+        rhythmSop = getRhythm(2);
+        pitchAlto = getPitch( 3, Tonic.MID);
+        rhythmAlto = getRhythm(4);
+        pitchTenor = getPitch( 5, Tonic.MID);
+        rhythmTenor = getRhythm(6);
+        pitchBass = getPitch( 7, Tonic.BASS);
+        rhythmBass = getRhythm(8);
+
+        Stats stats = new Stats(allLines, pitchSop, pitchAlto, pitchTenor, pitchBass);
+        stats.printSteps();
+        stats.printScaleDegrees();
+    }
+
+    private int[] getPitch(int index, Tonic tonic) {
+        return Stream.of(allLines.get(index).split(","))
+                .mapToInt(scaleDegree -> new ScaleDegree(tonic).map(scaleDegree))
+                .toArray();
+    }
+
+    private double[] getRhythm(int index) {
+        return Stream.of(allLines.get(index).split(",")).mapToDouble(Note::map).toArray();
+    }
 
 	public static void main(String[] args) throws Exception {
 	    String bachChoraleFileName = ((args != null) && (args.length > 0)) ? args[0] : null;
@@ -53,215 +88,4 @@ public class BachChoraleAnalyzer implements JMC {
             Play.midi(score);
         }
 	}
-
-    enum Tonic {
-        SOP  (72), // C inside treble clef staff
-        MID  (60), // C below treble clef staff
-        BASS (48); // C inside bass clef staff
-
-        int basePitch;
-
-        Tonic(int basePitch) {
-            this.basePitch = basePitch;
-        }
-
-        int getBasePitch() {
-            return basePitch;
-        }
-    }
-
-    private final Map<Integer, String> allLines = new TreeMap<>();
-
-    private final int[] pitchSop;
-    private final double[] rhythmSop;
-    private final int[] pitchAlto;
-    private final double[] rhythmAlto;
-    private final int[] pitchTenor;
-    private final double[] rhythmTenor;
-    private final int[] pitchBass;
-    private final double[] rhythmBass;
-
-    BachChoraleAnalyzer(String bachChoraleFileName) throws IOException {
-        if (bachChoraleFileName != null) {
-            addToAllLines(Files.readAllLines(Paths.get(bachChoraleFileName)));
-        } else {
-            try (Stream<Path> paths = Files.walk(Paths.get(""))) {
-                paths.filter(Files::isRegularFile).filter(path -> path.toString().contains(".csv")).forEach(path -> {
-                    try {
-                        System.out.println("Processing " + path);
-                        addToAllLines(Files.readAllLines(path));
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                });
-            }
-        }
-
-        pitchSop    = Stream.of(allLines.get(1).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.SOP)).toArray();
-        rhythmSop   = Stream.of(allLines.get(2).split(",")).mapToDouble(this::mapNote).toArray();
-        pitchAlto   = Stream.of(allLines.get(3).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.MID)).toArray();
-        rhythmAlto  = Stream.of(allLines.get(4).split(",")).mapToDouble(this::mapNote).toArray();
-        pitchTenor  = Stream.of(allLines.get(5).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.MID)).toArray();
-        rhythmTenor = Stream.of(allLines.get(6).split(",")).mapToDouble(this::mapNote).toArray();
-        pitchBass   = Stream.of(allLines.get(7).split(",")).mapToInt(scaleDegree -> mapScaleDegree(scaleDegree, Tonic.BASS)).toArray();
-        rhythmBass  = Stream.of(allLines.get(8).split(",")).mapToDouble(this::mapNote).toArray();
-
-        printStepWiseStats();
-        printScaleDegreeStats();
-    }
-
-    private void addToAllLines(List<String> fileLines) {
-        int lineNum = 1;
-        for (String line : fileLines) {
-            if (allLines.containsKey(lineNum)) {
-                allLines.put(lineNum, allLines.get(lineNum) + "," + line);
-            } else {
-                allLines.put(lineNum, line);
-            }
-            lineNum++;
-        }
-    }
-
-    private int mapScaleDegree(String scaleDegree, Tonic tonic) {
-        switch (scaleDegree) {
-            case "-8" :
-                return tonic.getBasePitch() + -12;
-            case "-2-": case "-1+" :
-                return tonic.getBasePitch() + -11;
-            case "-2":
-                return tonic.getBasePitch() + -10;
-            case "-2+": case "-3-" :
-                return tonic.getBasePitch() + -9;
-            case "-3":
-                return tonic.getBasePitch() + -8;
-            case "-4":
-                return tonic.getBasePitch() + -7;
-            case "-4+": case "-5-" :
-                return tonic.getBasePitch() + -6;
-            case "-5":
-                return tonic.getBasePitch() + -5;
-            case "-5+": case "-6-" :
-                return tonic.getBasePitch() + -4;
-            case "-6":
-                return tonic.getBasePitch() + -3;
-            case "-6+": case "-7-" :
-                return tonic.getBasePitch() + -2;
-            case "-7":
-                return tonic.getBasePitch() + -1;
-            case "1":
-                return tonic.getBasePitch();
-            case "1+": case "2-" :
-                return tonic.getBasePitch() + 1;
-            case "2":
-                return tonic.getBasePitch() + 2;
-            case "2+": case "3-" :
-                return tonic.getBasePitch() + 3;
-            case "3":
-                return tonic.getBasePitch() + 4;
-            case "4":
-                return tonic.getBasePitch() + 5;
-            case "4+": case "5-" :
-                return tonic.getBasePitch() + 6;
-            case "5":
-                return tonic.getBasePitch() + 7;
-            case "5+": case "6-" :
-                return tonic.getBasePitch() + 8;
-            case "6":
-                return tonic.getBasePitch() + 9;
-            case "6+": case "7-" :
-                return tonic.getBasePitch() + 10;
-            case "7":
-                return tonic.getBasePitch() + 11;
-            case "8":
-                return tonic.getBasePitch() + 12;
-            case "8+": case "9-" :
-                return tonic.getBasePitch() + 13;
-            case "9":
-                return tonic.getBasePitch() + 14;
-            case "9+": case "10-" :
-                return tonic.getBasePitch() + 15;
-            case "10":
-                return tonic.getBasePitch() + 16;
-            case "11":
-                return tonic.getBasePitch() + 17;
-            case "11+": case "12-" :
-                return tonic.getBasePitch() + 18;
-            case "12":
-                return tonic.getBasePitch() + 19;
-        }
-        throw new IllegalArgumentException("'" + scaleDegree + "' has no mapper");
-    }
-
-    private double mapNote(String note) {
-        switch (note) {
-            case "1" :
-                return 4.0;
-            case "2." :
-                return 3.0;
-            case "2" :
-                return 2.0;
-            case "4." :
-                return 1.5;
-            case "4" :
-                return 1.0;
-            case "8." :
-                return 0.75;
-            case "8" :
-                return 0.5;
-            case "16" :
-                return 0.25;
-        }
-        throw new IllegalArgumentException("'" + note + "' has no mapper");
-    }
-
-    private void printStepWiseStats() {
-        Map<Integer,Integer> steps = new TreeMap<>();
-        determineSteps(steps,pitchSop);
-        determineSteps(steps,pitchAlto);
-        determineSteps(steps,pitchTenor);
-        determineSteps(steps,pitchBass);
-        int totalOccurrences = steps.values().stream().mapToInt(Integer::valueOf).sum();
-        steps.forEach((key, value) -> System.out.println("Step " + key + " occurs " + value + " times (" + getPercentage(value, totalOccurrences) + "%)."));
-    }
-
-    private void determineSteps(Map<Integer,Integer> steps, int[] pitches) {
-       for (int x = (pitches.length - 1); x > 0; x--) {
-            int step = pitches[x - 1] - pitches[x];
-            if (step < 0) {
-                step *= -1;
-            }
-            int occurences = steps.getOrDefault(step,0) + 1;
-            steps.put(step, occurences);
-       }
-    }
-
-    private void printScaleDegreeStats() {
-        Map<String,Integer> scaleDegrees = new TreeMap<>();
-
-        determineScaleDegrees(scaleDegrees,allLines.get(1).split(","));
-        determineScaleDegrees(scaleDegrees,allLines.get(3).split(","));
-        determineScaleDegrees(scaleDegrees,allLines.get(5).split(","));
-        determineScaleDegrees(scaleDegrees,allLines.get(7).split(","));
-        int totalOccurrences = scaleDegrees.values().stream().mapToInt(Integer::valueOf).sum();
-        scaleDegrees.forEach(
-            (key, value) -> System.out.println("Scale degree " + key + " occurs " + value + " times (" + getPercentage(value, totalOccurrences) + "%).")
-        );
-    }
-
-    private void determineScaleDegrees(Map<String,Integer> scaleDegrees, String[] pitches) {
-        for (String s : pitches) {
-            String pitch = s.replace("8", "1").replace("9", "2")
-                    .replace("10", "3").replace("11", "4")
-                    .replace("12", "5");
-            if (pitch.startsWith("-")) {
-                pitch = pitch.substring(1);
-            }
-            int occurences = scaleDegrees.getOrDefault(pitch, 0) + 1;
-            scaleDegrees.put(pitch, occurences);
-        }
-    }
-
-    private long getPercentage(int value, int totalOccurrences) {
-        return Math.round(((double)value / (double)totalOccurrences) * 100);
-    }
 }
