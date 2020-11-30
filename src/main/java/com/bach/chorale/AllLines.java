@@ -1,10 +1,5 @@
 package com.bach.chorale;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -12,36 +7,21 @@ import java.util.stream.Stream;
 
 public class AllLines {
 
-    private final String bachChoraleFileName;
+    private final String chorale;
 
-    public AllLines(String bachChoraleFileName) {
-        this.bachChoraleFileName = bachChoraleFileName;
+    public AllLines(String chorale) {
+        this.chorale = chorale;
     }
 
-    public Map<Integer,String> build() throws IOException, URISyntaxException {
+    public Map<Integer,String> build() {
         Map<Integer, String> allLines = new TreeMap<>();
-        if (bachChoraleFileName != null) {
-            addToAllLines(
-                    Files.readAllLines(
-                            Paths.get(
-                                    ClassLoader.getSystemResource(bachChoraleFileName).toURI()
-                            )
-                    ),
-                    allLines
-            );
+        if (chorale != null) {
+            addToAllLines(Chorales.get(Integer.valueOf(chorale)), allLines);
         } else {
-            try (Stream<Path> paths = Files.walk(Paths.get(""))) {
-                paths.filter(Files::isRegularFile)
-                        .filter(path -> path.toString().contains(".csv") && ( ! path.toString().contains("src")))
-                        .forEach(path -> {
-                            try {
-                                System.out.println("Processing " + path.getFileName());
-                                addToAllLines(Files.readAllLines(path), allLines);
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        });
-            }
+            Chorales.getAll().forEach((k,v) -> {
+                System.out.println("Processing " + k);
+                addToAllLines(v, allLines);
+            });
         }
         return allLines;
     }
